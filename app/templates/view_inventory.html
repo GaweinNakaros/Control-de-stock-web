@@ -1,0 +1,39 @@
+<header>
+    <header>
+        <h1>Inventario</h1>
+    </header>
+    <main>
+        <table>
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>SKU</th>
+                    <th>Descripción</th>
+                    <th>Cantidad</th>
+                    <th>Precio</th>
+                    <th>Categoría</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in inventario %}
+                <tr>
+                    <td>{{ item[1] }}</td>
+                    <td>{{ item[2] }}</td>
+                    <td>{{ item[3] }}</td>
+                    <td>{{ item[4] }}</td>
+                    <td>${{ item[5] }}</td>
+                    <td>{{ item[6] }}</td>
+                    <td>
+                        <form action="/delete/{{ item[2] }}" method="post" style="display:inline;">
+                            <button type="submit">Eliminar</button>
+                        </form>
+                        <a href="/edit/{{ item[2] }}">Editar</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <br>
+        <a href="/">Volver al menú</a>
+    </main>

@@ -1,0 +1,20 @@
+<header>
+    <h1>Buscar Item</h1>
+</header>
+<main>
+    <form action="/search" method="post">
+        <label>SKU:</label>
+        <input type="text" name="sku" required>
+        <button type="submit">Buscar</button>
+    </form>
+    {% if item %}
+    <h2>Resultado:</h2>
+    <p><strong>Nombre:</strong> {{ item[1] }}</p>
+    <p><strong>Descripción:</strong> {{ item[3] }}</p>
+    <p><strong>Cantidad:</strong> {{ item[4] }}</p>
+    <p><strong>Precio:</strong> ${{ item[5] }}</p>
+    <p><strong>Categoría:</strong> {{ item[6] }}</p>
+    {% endif %}
+    <br>
+    <a href="/">Volver al menú</a>
+</main>

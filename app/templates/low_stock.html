@@ -1,0 +1,28 @@
+<header>
+    <h1>Reporte de Stock Bajo</h1>
+</header>
+<main>
+    <form action="/low-stock" method="post">
+        <label>Límite de Stock:</label>
+        <input type="number" name="limite" value="{{ limite }}">
+        <button type="submit">Actualizar</button>
+    </form>
+    <table>
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Cantidad</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in stock_bajo %}
+            <tr>
+                <td>{{ item[0] }}</td>
+                <td>{{ item[1] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <br>
+    <a href="/">Volver al menú</a>
+</main>
