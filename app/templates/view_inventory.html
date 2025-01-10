@@ -31,6 +31,15 @@
                         <a href="/edit/{{ item[2] }}">Editar</a>
                     </td>
                 </tr>
+                <div>
+                    {% if page > 1 %}
+                      <a href="{{ url_for('view_inventory', page=page-1) }}">Anterior</a>
+                    {% endif %}
+                    <span>Página {{ page }} de {{ total_pages }}</span>
+                    {% if page < total_pages %}
+                      <a href="{{ url_for('view_inventory', page=page+1) }}">Siguiente</a>
+                    {% endif %}
+                  </div>
                 {% endfor %}
             </tbody>
         </table>

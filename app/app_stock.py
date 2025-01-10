@@ -1,5 +1,18 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, g # Mejorar la gestión de base de datos utilizando un contexto de conexión
+from flask_wtf import FlaskForm
+from wtforms import StringField, IntegerField, FloatField
+from wtforms.validators import DataRequired, NumberRange
+from inventario import inventario_bp
+
 import sqlite3  # Para manejar la base de datos SQLite
+
+class ItemForm(FlaskForm):
+    nombre = StringField('Nombre', validators=[DataRequired()])
+    sku = StringField('SKU', validators=[DataRequired()])
+    descripcion = StringField('Descripción')
+    cantidad = IntegerField('Cantidad', validators=[DataRequired(), NumberRange(min=1)])
+    precio = FloatField('Precio', validators=[DataRequired(), NumberRange(min=0.01)])
+    categoria = StringField('Categoría')
 
 # Inicializar la aplicación Flask
 app = Flask(__name__)
@@ -27,6 +40,31 @@ def create_table_inventario():
 # Llamada para asegurar que la tabla exista al inicio
 create_table_inventario()
 
+# Usar un hook para gestionar la conexión a la base de datos
+# Reemplaza las consultas directas con el uso de get_db()
+def get_db():
+    if 'db' not in g:
+        g.db = sqlite3.connect("inventario.db")
+        g.db.row_factory = sqlite3.Row  # Permite acceder a las columnas por nombre
+    return g.db
+
+@app.teardown_appcontext
+def close_db(error):
+    db = g.pop('db', None)
+    if db is not None:
+        db.close()
+
+# Proteccion consultas
+def safe_query(query, params=()):
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute(query, params)
+        return cursor
+    except sqlite3.Error as e:
+        print(f"Error en la consulta: {e}")
+        return None
+
 # Ruta para el menú principal
 @app.route('/')
 def menu():
@@ -34,9 +72,15 @@ def menu():
     return render_template('menu.html')
 
 # Ruta para agregar un nuevo item al inventario
+
+def validate_item_data(nombre, sku, cantidad, precio):
+    if not nombre or not sku or cantidad <= 0 or precio <= 0:
+        return False
+    return True
+
 @app.route('/add', methods=['GET', 'POST'])
 def add_item():
-    """Permite agregar un nuevo item al inventario mediante un formulario"""
+    message = ""
     if request.method == 'POST':
         nombre = request.form['nombre']
         sku = request.form['sku']
@@ -45,29 +89,25 @@ def add_item():
         precio = float(request.form['precio'])
         categoria = request.form['categoria']
 
-        conn = sqlite3.connect("inventario.db")
-        cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO inventario (nombre, sku, descripcion, cantidad, precio, categoria)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (nombre, sku, descripcion, cantidad, precio, categoria))
-        conn.commit()
-        conn.close()
+        if not validate_item_data(nombre, sku, cantidad, precio):
+            return render_template('add_item.html', error="Datos inválidos")
 
-        return redirect(url_for('menu'))
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("""INSERT INTO inventario (nombre, sku, descripcion, cantidad, precio, categoria) 
+                          VALUES (?, ?, ?, ?, ?, ?)""",
+                       (nombre, sku, descripcion, cantidad, precio, categoria))
+        db.commit()
 
-    return render_template('add_item.html')
+        message = "Item agregado con éxito"
+        return render_template('add_item.html', message=message)
 
-# Ruta para visualizar el inventario
-@app.route('/view')
-def view_inventory():
-    """Muestra el inventario completo en una tabla"""
-    conn = sqlite3.connect("inventario.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM inventario")
-    inventario = cursor.fetchall()
-    conn.close()
-    return render_template('view_inventory.html', inventario=inventario)
+    return render_template('add_item.html', message=message)
+
+# Ruta para ver el inventario
+# En app_stock.py
+
+app.register_blueprint(inventario_bp)
 
 # Ruta para buscar un item por SKU
 @app.route('/search', methods=['GET', 'POST'])
