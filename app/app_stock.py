@@ -1,20 +1,20 @@
 # Flask App Template Integrado con Gestión de Inventario
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for  # Este es el módulo principal de Flask que importa las funciones necesarias para crear la aplicación, renderizar plantillas HTML, manejar solicitudes y responder con JSON.
-import sqlite3  # Importamos el módulo sqlite3
+from flask import Flask, render_template, request, jsonify, redirect, url_for
+import sqlite3
 
 # Crear Flask app
-app = Flask(__name__)  # Crea una instancia de la aplicación Flask. '__name__' indica el módulo actual, lo cual ayuda a Flask a encontrar recursos.
+app = Flask(__name__)
 
 # Configuración
-app.config['SECRET_KEY'] = 'your_secret_key_here'  # Establece una clave secreta utilizada para la seguridad de la aplicación, como firmar cookies o manejar sesiones.
-app.config['DEBUG'] = True  # Activa el modo de depuración para desarrollo. Cambiar a False en producción.
+app.config['SECRET_KEY'] = 'your_secret_key_here'
+app.config['DEBUG'] = True
 
 # Funciones de gestión de inventario
 def create_table_inventario():
-    conn = sqlite3.connect("inventario.db")  # Conexión a la base de datos
+    conn = sqlite3.connect("inventario.db")
     cursor = conn.cursor()
-    query = f"""CREATE TABLE IF NOT EXISTS inventario (
+    query = """CREATE TABLE IF NOT EXISTS inventario (
                 inventario_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 nombre TEXT NOT NULL,
                 sku TEXT NOT NULL UNIQUE,
@@ -22,113 +22,118 @@ def create_table_inventario():
                 cantidad INTEGER,
                 precio INTEGER,
                 categoria TEXT
-                )"""
+            )"""
     cursor.execute(query)
     conn.commit()
     conn.close()
 
-def registrar_item(nombre, sku, descripcion, cantidad, precio, categoria):
-    conn = sqlite3.connect("inventario.db")
-    cursor = conn.cursor()
-    query = f"INSERT INTO inventario (nombre, sku, descripcion, cantidad, precio, categoria) VALUES(?, ?, ?, ?, ?, ?)"
-    cursor.execute(query, (nombre, sku, descripcion, cantidad, precio, categoria))
-    conn.commit()
-    conn.close()
-
-def get_inventario():
-    conn = sqlite3.connect("inventario.db")
-    cursor = conn.cursor()
-    query = f"SELECT * FROM inventario"
-    cursor.execute(query)
-    inventario = cursor.fetchall()
-    conn.close()
-    return inventario
-
-def buscar_item(sku):
-    conn = sqlite3.connect("inventario.db")
-    cursor = conn.cursor()
-    query = f"SELECT * FROM inventario WHERE sku = ?"
-    cursor.execute(query, (sku,))
-    item = cursor.fetchone()
-    conn.close()
-    return item
-
-def modificar_item(sku, nombre=None, descripcion=None, cantidad=None, precio=None, categoria=None):
-    conn = sqlite3.connect("inventario.db")
-    cursor = conn.cursor()
-    updates = []
-    if nombre: updates.append(f"nombre = '{nombre}'")
-    if descripcion: updates.append(f"descripcion = '{descripcion}'")
-    if cantidad is not None: updates.append(f"cantidad = {cantidad}")
-    if precio is not None: updates.append(f"precio = {precio}")
-    if categoria: updates.append(f"categoria = '{categoria}'")
-    if updates:
-        update_query = ", ".join(updates)
-        query = f"UPDATE inventario SET {update_query} WHERE sku = ?"
-        cursor.execute(query, (sku,))
-        conn.commit()
-    conn.close()
-
-def borrar_item(sku):
-    conn = sqlite3.connect("inventario.db")
-    cursor = conn.cursor()
-    query = f"DELETE FROM inventario WHERE sku = ?"
-    cursor.execute(query, (sku,))
-    conn.commit()
-    conn.close()
-
-# Crear tabla al iniciar
+# Crear tabla inicial
 create_table_inventario()
 
 # Rutas
 @app.route('/')
-def home():
-    inventario = get_inventario()
-    return render_template('index.html', inventario=inventario)
+def menu():
+    return render_template('menu.html')
 
-@app.route('/add', methods=['POST'])
+@app.route('/add', methods=['GET', 'POST'])
 def add_item():
-    nombre = request.form['nombre']
-    sku = request.form['sku']
-    descripcion = request.form['descripcion']
-    cantidad = int(request.form['cantidad'])
-    precio = int(request.form['precio'])
-    categoria = request.form['categoria']
-    registrar_item(nombre, sku, descripcion, cantidad, precio, categoria)
-    return redirect(url_for('home'))
+    if request.method == 'POST':
+        nombre = request.form['nombre']
+        sku = request.form['sku']
+        descripcion = request.form['descripcion']
+        cantidad = int(request.form['cantidad'])
+        precio = int(request.form['precio'])
+        categoria = request.form['categoria']
+        conn = sqlite3.connect("inventario.db")
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO inventario (nombre, sku, descripcion, cantidad, precio, categoria) VALUES (?, ?, ?, ?, ?, ?)", (nombre, sku, descripcion, cantidad, precio, categoria))
+        conn.commit()
+        conn.close()
+        return redirect(url_for('menu'))
+    return render_template('add_item.html')
 
-@app.route('/delete/<sku>', methods=['POST'])
-def delete_item(sku):
-    borrar_item(sku)
-    return redirect(url_for('home'))
+@app.route('/view')
+def view_inventory():
+    conn = sqlite3.connect("inventario.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM inventario")
+    inventario = cursor.fetchall()
+    conn.close()
+    return render_template('view_inventory.html', inventario=inventario)
+
+@app.route('/search', methods=['GET', 'POST'])
+def search_item():
+    item = None
+    if request.method == 'POST':
+        sku = request.form['sku']
+        conn = sqlite3.connect("inventario.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM inventario WHERE sku = ?", (sku,))
+        item = cursor.fetchone()
+        conn.close()
+    return render_template('search_item.html', item=item)
 
 @app.route('/edit/<sku>', methods=['GET', 'POST'])
 def edit_item(sku):
+    conn = sqlite3.connect("inventario.db")
+    cursor = conn.cursor()
     if request.method == 'POST':
-        nombre = request.form.get('nombre')
-        descripcion = request.form.get('descripcion')
-        cantidad = request.form.get('cantidad')
-        cantidad = int(cantidad) if cantidad else None
-        precio = request.form.get('precio')
-        precio = int(precio) if precio else None
-        categoria = request.form.get('categoria')
-        modificar_item(sku, nombre, descripcion, cantidad, precio, categoria)
-        return redirect(url_for('home'))
-    item = buscar_item(sku)
-    return render_template('edit.html', item=item)
+        nombre = request.form['nombre']
+        descripcion = request.form['descripcion']
+        cantidad = int(request.form['cantidad'])
+        precio = int(request.form['precio'])
+        categoria = request.form['categoria']
+        cursor.execute("UPDATE inventario SET nombre = ?, descripcion = ?, cantidad = ?, precio = ?, categoria = ? WHERE sku = ?",
+                       (nombre, descripcion, cantidad, precio, categoria, sku))
+        conn.commit()
+        conn.close()
+        return redirect(url_for('view_inventory'))
+    cursor.execute("SELECT * FROM inventario WHERE sku = ?", (sku,))
+    item = cursor.fetchone()
+    conn.close()
+    return render_template('edit_item.html', item=item)
+
+@app.route('/delete/<sku>', methods=['POST'])
+def delete_item(sku):
+    conn = sqlite3.connect("inventario.db")
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM inventario WHERE sku = ?", (sku,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('view_inventory'))
+
+@app.route('/report')
+def report_stock():
+    conn = sqlite3.connect("inventario.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT nombre, cantidad FROM inventario")
+    stock = cursor.fetchall()
+    conn.close()
+    return render_template('report_stock.html', stock=stock)
+
+@app.route('/low-stock', methods=['GET', 'POST'])
+def low_stock():
+    limite = 5
+    if request.method == 'POST':
+        limite = int(request.form['limite'])
+    conn = sqlite3.connect("inventario.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT nombre, cantidad FROM inventario WHERE cantidad <= ?", (limite,))
+    stock_bajo = cursor.fetchall()
+    conn.close()
+    return render_template('low_stock.html', stock_bajo=stock_bajo, limite=limite)
 
 # Error handling
 @app.errorhandler(404)
 def not_found_error(error):
-    return render_template('404.html'), 404
-
-@app.errorhandler(500)
-def internal_error(error):
-    return jsonify({"error": "Internal Server Error"}), 500
+    return render_template('404.html', message="La página que buscas no existe."), 404
 
 # Run the app
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(debug=True)
+
+
+
 
 
 
